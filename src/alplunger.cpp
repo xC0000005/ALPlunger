@@ -10,6 +10,11 @@
 #define SCL_MASK 0x20
 #define DATA_MASK 0xFF
 #define RESTART_PULSE_LENGTH 1000
+// this is for the uno r3
+#define PWM_PIN 5
+
+// Plunger's the first value
+#define PLUNGER_VALUE_INDEX 0
 #define VALUES_PER_PACKET 4
 
 // on a tiny, this isn't available
@@ -29,8 +34,7 @@ PlungerData current_plunger_data;
 PlungerData inbound_plunger_data;
 short data_index = 0;
 
-#define SAMPLE_SIZE 512
-short data[SAMPLE_SIZE] = {};
+short *data = (short *)&inbound_plunger_data;
 
 void setup()
 {
@@ -47,11 +51,11 @@ void loop()
     int sda = 1;
     short input = 0;
     short bit = 0;
-    int packet_counter = 0;
 
     // the Arduino way is to do all this in Setup()
     // but after signaling the reset we should move quickly
     // to start the read loop and we have to muck with pinModes anyway
+    pinMode(LED_BUILTIN, PWM_PIN);
     pinMode(SCL, OUTPUT);
 
     // Restart the bitstream so we dont' start in the middle of packets
@@ -78,40 +82,23 @@ void loop()
                 bit = 0;
                 input = 0;
 
-                if (data_index % VALUES_PER_PACKET == 0)
+                if (data_index % VALUES_PER_PACKET == PLUNGER_VALUE_INDEX)
                 {
                     if (current_plunger_data.plunger_value != inbound_plunger_data.plunger_value)
                     {
-                        Serial.println(inbound_plunger_data.plunger_value);
+                        // leave this to debug accelerometer bits and the weird banding
+                        // with the unknown top and bottom bits.
+                        //Serial.println(inbound_plunger_data.plunger_value);
+                        analogWrite(PWM_PIN, inbound_plunger_data.plunger_value << 1);
                         current_plunger_data.plunger_value = inbound_plunger_data.plunger_value;
                         memset(&inbound_plunger_data, 0, sizeof(inbound_plunger_data));
-                    }
 
-                    packet_counter = 0;
+                    }
+                    data_index = 0;
                 }
             }
         }
 
         previous_scl = scl;
-
-        if (data_index == SAMPLE_SIZE)
-        {
-            break;
-        }
     }
-
-    #ifdef USE_SERIAL_COMS
-    {
-        char message_buffer[256];
-
-        // Display
-        for (int i = 0; i < SAMPLE_SIZE; i += 4)
-        {
-            sprintf(message_buffer, "%04X %04X %04X %04X\r\n", data[i], data[i + 1], data[i + 2], data[i + 3]);
-            Serial.print(message_buffer);
-        }
-    }
-
-    delay(10000);
-    #endif
 }
