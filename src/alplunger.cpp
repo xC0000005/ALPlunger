@@ -89,7 +89,7 @@ void loop()
                         // leave this to debug accelerometer bits and the weird banding
                         // with the unknown top and bottom bits.
                         //Serial.println(inbound_plunger_data.plunger_value);
-                        analogWrite(PWM_PIN, inbound_plunger_data.plunger_value << 1);
+                        analogWrite(PWM_PIN, inbound_plunger_data.plunger_value);
                         current_plunger_data.plunger_value = inbound_plunger_data.plunger_value;
                         memset(&inbound_plunger_data, 0, sizeof(inbound_plunger_data));
 
