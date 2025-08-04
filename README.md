@@ -5,8 +5,7 @@ Despite this, the protocol is only I2C-ish. Clock signal is inverted, there's no
 and it appears there are 11 clocks per packet. It looks from traces like the last two are always 1, so
 if this is i2c-like, that's a "write" (which it is, the bus master is writing) and an ack (as in, it doesn't care if you ack it, it's confirming it sent it.)
 
-Data is transmitted in four packet sequences with 0 being the plunger and 1-3 being unknown, but very
-likely the data from the accelerometer, which should probably be left plugged in, since values are still sent even if it's disconnected, but the plunger waits longer to update position.
+Data is transmitted in four packet sequences with 0 being the plunger and 1-3 being the data from the accelerometer, which should probably be left plugged in, since values are still sent even if it's disconnected, but the plunger waits longer to update position.
 Speed appears to be standard mode i2c, but there's no address or command bytes, from startup
 the chip simply screams four packet sets. If the accelerometer is plugged in, the packets are 4x as
 frequent. Pulling SCL low and holding it for >107ms results in a reset so the reader can get clean 
@@ -14,7 +13,11 @@ data.
 
 Because there is no signal for when data is ready and the bus master basically sends it constantly, the best way to interface with this is likely either a bluepill exporting the data as HID (a joystick) or, if you're using a control board with support for potentimeter plungers, use the analogWrite to mimic the plunger.
 
-Accelerometer bytes:
+Accelerometer:
+The acelerometer is at address 0x1C and looks to be a MMA8451, though one board I have is a knockoff that uses the same set of register commands. Once it's initialized the plunger reads register 1, six bytes, which makes sense if it's the standard XH, XL, YH, YL, ZH, ZL.
+The address auto-increments on reads, so it's expected there wouldn't be register sets between reads. This means the unknown bytes
+are likely (X, Y, Z) in order, though we'd need to tamper with the bus to be sure.
+
 If the accelerometer is unplugged, the last three bytes (on the two board sets I have) are:
 00FE 0000 0000
 Plugging in the accelerometer (even without re-starting) immediately begins publishing a set of values that vary by about +/- 2. Tapping the accelerometer yields immediate changes but of course happens in all three axis. It would probably be possible to build a multi-master wiring in which the arduino changes the configuration values for axis and thus reveals which byte correlates to what axis. 
