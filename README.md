@@ -13,3 +13,10 @@ frequent. Pulling SCL low and holding it for >107ms results in a reset so the re
 data.
 
 Because there is no signal for when data is ready and the bus master basically sends it constantly, the best way to interface with this is likely either a bluepill exporting the data as HID (a joystick) or, if you're using a control board with support for potentimeter plungers, use the analogWrite to mimic the plunger.
+
+Accelerometer bytes:
+If the accelerometer is unplugged, the last three bytes (on the two board sets I have) are:
+00FE 0000 0000
+Plugging in the accelerometer (even without re-starting) immediately begins publishing a set of values that vary by about +/- 2. Tapping the accelerometer yields immediate changes but of course happens in all three axis. It would probably be possible to build a multi-master wiring in which the arduino changes the configuration values for axis and thus reveals which byte correlates to what axis. 
+
+It seems clear that the plunger IC, in addition to reading the data, is performing averaging/ranging on the data and presenting it back. This may explain why a relatively functional accelerometer seems to give a rough experience (or it could be the pinball code.)
