@@ -86,13 +86,20 @@ void loop()
                 {
                     if (current_plunger_data.plunger_value != inbound_plunger_data.plunger_value)
                     {
+                        #ifdef USE_SERIAL_COMS
                         // leave this to debug accelerometer bits and the weird banding
                         // with the unknown top and bottom bits.
-                        //Serial.println(inbound_plunger_data.plunger_value);
-                        analogWrite(PWM_PIN, inbound_plunger_data.plunger_value);
+                        Serial.println(inbound_plunger_data.plunger_value);
+                        //char buffer[64];
+                        //sprintf(buffer, "%04X %04X %04X", inbound_plunger_data.unknown1, inbound_plunger_data.unknown2, inbound_plunger_data.unknown3);
+                        //Serial.println(buffer);
+                        #endif
+                        short plunger_adapted = inbound_plunger_data.plunger_value << 1;
+                        if (plunger_adapted > 255)
+                            plunger_adapted = 255; 
+                        analogWrite(PWM_PIN, plunger_adapted);
                         current_plunger_data.plunger_value = inbound_plunger_data.plunger_value;
                         memset(&inbound_plunger_data, 0, sizeof(inbound_plunger_data));
-
                     }
                     data_index = 0;
                 }
