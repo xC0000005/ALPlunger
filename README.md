@@ -2,10 +2,10 @@ Information on how to read the Legends Pinball plunger (which reads the accelero
 
 The plunger board has pins for 5v (and downconverts for the 3v accelerometer), GND, SCL and SDA.
 Despite this, the protocol is only I2C-ish. Clock signal is inverted, there's no start/stop sequence
-and it appears there are 11 clocks per packet. It looks from traces like the last two are always 1, so
-if this is i2c-like, that's a "write" (which it is, the bus master is writing) and an ack (as in, it doesn't care if you ack it, it's confirming it sent it.)
+and it appears there are 11 clocks per packet. There's a start bit, a parity bit (even), a bit that's always 0 and 8 data bits. The resulting plunger values are from 0 (all the way in) to 65 (all the way out);
 
 Data is transmitted in four packet sequences with 0 being the plunger and 1-3 being the data from the accelerometer, which should probably be left plugged in, since values are still sent even if it's disconnected, but the plunger waits longer to update position.
+
 Speed appears to be standard mode i2c, but there's no address or command bytes, from startup
 the chip simply screams four packet sets. If the accelerometer is plugged in, the packets are 4x as
 frequent. Pulling SCL low and holding it for >107ms results in a reset so the reader can get clean 

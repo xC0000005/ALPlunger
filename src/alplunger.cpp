@@ -6,19 +6,35 @@
 
 // Clock in ten bits per packet
 #define CLOCK_BITS 11
-#define SDA_MASK 0x10
-#define SCL_MASK 0x20
-#define DATA_MASK 0xFF
+#define DATA_MASK 0x1FF
 #define RESTART_PULSE_LENGTH 1000
-// this is for the uno r3
-#define PWM_PIN 5
+
+#ifdef LEONARDO
+    #define I2C_PORT PIND
+    #define SDA_MASK 0x2
+    #define SCL_MASK 0x1
+    // using D9 for leonardo/beetle 
+    #define PWM_PIN 9
+#endif
+#ifdef TINY88
+    #define I2C_PORT PINC
+    #define SDA_MASK 0x10
+    #define SCL_MASK 0x20
+    #define PWM_PIN 9
+#endif
+#ifdef UNO 
+    // this is for the uno r3 and nano
+    #define I2C_PORT PINC
+    #define SDA_MASK 0x10
+    #define SCL_MASK 0x20
+    #define PWM_PIN 5
+#endif
 
 // Plunger's the first value
 #define PLUNGER_VALUE_INDEX 0
 #define VALUES_PER_PACKET 4
 
-// on a tiny, this isn't available
-#define USE_SERIAL_COMS 
+// #define SERIAL_DEBUGGING 
 
 // These types are shorts in case the unknown bits turn out to be
 // useful. If not, they could be converted to bytes
@@ -38,14 +54,15 @@ short *data = (short *)&inbound_plunger_data;
 
 void setup()
 {
-#ifdef USE_SERIAL_COMS
+#ifdef SERIAL_DEBUGGING
     Serial.begin(19200);
-    Serial.println();
+    while (!Serial);
+    Serial.println("starting");
 #endif
 }
 
 void loop()
-{
+{    
     int previous_scl = SCL_MASK;
     int scl = 0;
     int sda = 1;
@@ -55,7 +72,7 @@ void loop()
     // the Arduino way is to do all this in Setup()
     // but after signaling the reset we should move quickly
     // to start the read loop and we have to muck with pinModes anyway
-    pinMode(LED_BUILTIN, PWM_PIN);
+    pinMode(PWM_PIN, OUTPUT); 
     pinMode(SCL, OUTPUT);
 
     // Restart the bitstream so we dont' start in the middle of packets
@@ -66,19 +83,19 @@ void loop()
 
     for (;;)
     {
-        scl = PINC & SCL_MASK;
+        scl = I2C_PORT & SCL_MASK;
 
         // if SCL has changed to low, clock a bit
-        if (previous_scl < scl)
+        if (scl < previous_scl)
         {
-            sda = (PINC & SDA_MASK) == SDA_MASK;
+            sda = (I2C_PORT & SDA_MASK) == SDA_MASK;
             input |= (sda << bit);
 
             bit++;
 
             if (bit == CLOCK_BITS)
             {
-                data[data_index++] = input & DATA_MASK;
+                data[data_index++] = ((input & DATA_MASK) >> 1);
                 bit = 0;
                 input = 0;
 
@@ -86,17 +103,26 @@ void loop()
                 {
                     if (current_plunger_data.plunger_value != inbound_plunger_data.plunger_value)
                     {
-                        #ifdef USE_SERIAL_COMS
-                        // leave this to debug accelerometer bits and the weird banding
-                        // with the unknown top and bottom bits.
-                        Serial.println(inbound_plunger_data.plunger_value);
+                        #ifdef SERIAL_DEBUGGING
+                        Serial.println(inbound_plunger_data.plunger_value & 0xFF);
                         //char buffer[64];
                         //sprintf(buffer, "%04X %04X %04X", inbound_plunger_data.unknown1, inbound_plunger_data.unknown2, inbound_plunger_data.unknown3);
                         //Serial.println(buffer);
                         #endif
-                        short plunger_adapted = inbound_plunger_data.plunger_value << 1;
-                        if (plunger_adapted > 255)
+
+                        // Values range from 0 to 65. Map it so that we always return at least 1,
+                        // then multiply by 4 and clamp at 255.
+                        short plunger_adapted = inbound_plunger_data.plunger_value << 2;
+                        if (!plunger_adapted)
+                        {
+                            plunger_adapted = 1;
+                        }
+
+                        if (plunger_adapted > 255) 
+                        {
                             plunger_adapted = 255; 
+                        }
+
                         analogWrite(PWM_PIN, plunger_adapted);
                         current_plunger_data.plunger_value = inbound_plunger_data.plunger_value;
                         memset(&inbound_plunger_data, 0, sizeof(inbound_plunger_data));
