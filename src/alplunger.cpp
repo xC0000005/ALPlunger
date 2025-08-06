@@ -75,6 +75,10 @@ void loop()
     pinMode(PWM_PIN, OUTPUT); 
     pinMode(SCL, OUTPUT);
 
+    // This is a value that can't happen, ensuring our first read results
+    // in a analogWrite.
+    current_plunger_data.plunger_value = 0x2FF;
+    
     // Restart the bitstream so we dont' start in the middle of packets
     digitalWrite(SCL, LOW);
     delay(RESTART_PULSE_LENGTH);
