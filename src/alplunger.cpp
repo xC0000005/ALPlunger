@@ -9,6 +9,13 @@
 #define DATA_MASK 0x1FF
 #define RESTART_PULSE_LENGTH 1000
 
+#ifdef UNO 
+    // this is for the uno r3 and nano
+    #define I2C_PORT PINC
+    #define SDA_MASK 0x10
+    #define SCL_MASK 0x20
+    #define PWM_PIN 5
+#endif
 #ifdef LEONARDO
     #define I2C_PORT PIND
     #define SDA_MASK 0x2
@@ -22,35 +29,27 @@
     #define SCL_MASK 0x20
     #define PWM_PIN 9
 #endif
-#ifdef UNO 
-    // this is for the uno r3 and nano
-    #define I2C_PORT PINC
-    #define SDA_MASK 0x10
-    #define SCL_MASK 0x20
-    #define PWM_PIN 5
+#ifdef TINY85
+    // Pin 0 PWM works.
+    // Pin 1 is an LED and should be avoided.
+    // Pin 2 worked fine for PWM.
+    // Pin 3 is always on 
+    // Pin 5 is always on
+    #define I2C_PORT PINB
+    #define SDA_MASK 0x4
+    #define SCL_MASK 0x10
+    #define SDA 2
+    #define SCL 4
+    #define PWM_PIN 0
 #endif
 
 // Plunger's the first value
 #define PLUNGER_VALUE_INDEX 0
 #define VALUES_PER_PACKET 4
+#define MINIMUM_DELAY_FOR_UPDATE 100
 
+// output data on mcus that support it
 // #define SERIAL_DEBUGGING 
-
-// These types are shorts in case the unknown bits turn out to be
-// useful. If not, they could be converted to bytes
-struct PlungerData
-{
-    short plunger_value;
-    short unknown1;
-    short unknown2;
-    short unknown3;
-};
-
-PlungerData current_plunger_data;
-PlungerData inbound_plunger_data;
-short data_index = 0;
-
-short *data = (short *)&inbound_plunger_data;
 
 void setup()
 {
@@ -68,6 +67,16 @@ void loop()
     int sda = 1;
     short input = 0;
     short bit = 0;
+    #ifdef LED_SIGNAL
+    byte led = 0;
+    #endif
+    byte data_index = 0;
+    int last_update = millis();
+
+    // This is a value that can't happen, ensuring our first read results
+    // in a analogWrite.
+    short current_plunger_value = 0x2FF;
+    short inbound_plunger_value = 0;
 
     // the Arduino way is to do all this in Setup()
     // but after signaling the reset we should move quickly
@@ -75,15 +84,14 @@ void loop()
     pinMode(PWM_PIN, OUTPUT); 
     pinMode(SCL, OUTPUT);
 
-    // This is a value that can't happen, ensuring our first read results
-    // in a analogWrite.
-    current_plunger_data.plunger_value = 0x2FF;
-    
     // Restart the bitstream so we dont' start in the middle of packets
     digitalWrite(SCL, LOW);
     delay(RESTART_PULSE_LENGTH);
     pinMode(SCL, INPUT);
     pinMode(SDA, INPUT);
+
+    int write_counter = 0;
+    int led = 0;
 
     for (;;)
     {
@@ -92,6 +100,13 @@ void loop()
         // if SCL has changed to low, clock a bit
         if (scl < previous_scl)
         {
+            write_counter++;
+            if (write_counter % 50 == 0) {
+
+            digitalWrite(LED_BUILTIN, led);
+            led = ! led;
+            }
+
             sda = (I2C_PORT & SDA_MASK) == SDA_MASK;
             input |= (sda << bit);
 
@@ -99,40 +114,44 @@ void loop()
 
             if (bit == CLOCK_BITS)
             {
-                data[data_index++] = ((input & DATA_MASK) >> 1);
-                bit = 0;
-                input = 0;
-
-                if (data_index % VALUES_PER_PACKET == PLUNGER_VALUE_INDEX)
+                if (data_index == PLUNGER_VALUE_INDEX)
                 {
-                    if (current_plunger_data.plunger_value != inbound_plunger_data.plunger_value)
+                    inbound_plunger_value = ((input & DATA_MASK) >> 1); 
+                    if (current_plunger_value != inbound_plunger_value)
                     {
-                        #ifdef SERIAL_DEBUGGING
-                        Serial.println(inbound_plunger_data.plunger_value & 0xFF);
-                        //char buffer[64];
-                        //sprintf(buffer, "%04X %04X %04X", inbound_plunger_data.unknown1, inbound_plunger_data.unknown2, inbound_plunger_data.unknown3);
-                        //Serial.println(buffer);
-                        #endif
-
-                        // Values range from 0 to 65. Map it so that we always return at least 1,
-                        // then multiply by 4 and clamp at 255.
-                        short plunger_adapted = inbound_plunger_data.plunger_value << 2;
-                        if (!plunger_adapted)
+                        int now = millis();
+                        if (now - last_update > MINIMUM_DELAY_FOR_UPDATE)
                         {
-                            plunger_adapted = 1;
+                            // Values range from 0 to 65. Map it so that we always return at least 1,
+                            // then multiply by 4 and clamp at 255.
+                            unsigned short plunger_adapted = inbound_plunger_value << 2;
+                            if (!plunger_adapted)
+                            {
+                                plunger_adapted = 1;
+                            }
+
+                            if (plunger_adapted > 255) 
+                            {
+                                plunger_adapted = 255; 
+                            }
+
+                            analogWrite(PWM_PIN, plunger_adapted);
+                            current_plunger_value = inbound_plunger_value;
+                            last_update = millis();
                         }
 
-                        if (plunger_adapted > 255) 
-                        {
-                            plunger_adapted = 255; 
-                        }
-
-                        analogWrite(PWM_PIN, plunger_adapted);
-                        current_plunger_data.plunger_value = inbound_plunger_data.plunger_value;
-                        memset(&inbound_plunger_data, 0, sizeof(inbound_plunger_data));
+                        inbound_plunger_value = 0;
                     }
+                }
+
+                data_index++;
+
+                if (data_index == VALUES_PER_PACKET) {
                     data_index = 0;
                 }
+
+                bit = 0;
+                input = 0;
             }
         }
 
