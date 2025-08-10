@@ -122,17 +122,12 @@ void loop()
                         int now = millis();
                         if (now - last_update > MINIMUM_DELAY_FOR_UPDATE)
                         {
-                            // Values range from 0 to 65. Map it so that we always return at least 1,
-                            // then multiply by 4 and clamp at 255.
-                            unsigned short plunger_adapted = inbound_plunger_value << 2;
+                            // Values range from 0 to 65. Map it so that we always return at least 1
+                            // because 0 is a long pulse to read.
+                            unsigned short plunger_adapted = inbound_plunger_value;
                             if (!plunger_adapted)
                             {
                                 plunger_adapted = 1;
-                            }
-
-                            if (plunger_adapted > 255) 
-                            {
-                                plunger_adapted = 255; 
                             }
 
                             analogWrite(PWM_PIN, plunger_adapted);
