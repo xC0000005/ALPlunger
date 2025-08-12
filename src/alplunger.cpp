@@ -30,11 +30,8 @@
     #define PWM_PIN 9
 #endif
 #ifdef TINY85
-    // Pin 0 PWM works.
-    // Pin 1 is an LED and should be avoided.
-    // Pin 2 worked fine for PWM.
-    // Pin 3 is always on 
-    // Pin 5 is always on
+    // These pins are chosen for a digispark where the LED is on pin 1.
+    // some have the LED on pin 0 and the right value for the PWM pin is 1.
     #define I2C_PORT PINB
     #define SDA_MASK 0x4
     #define SCL_MASK 0x10
@@ -46,7 +43,6 @@
 // Plunger's the first value
 #define PLUNGER_VALUE_INDEX 0
 #define VALUES_PER_PACKET 4
-#define MINIMUM_DELAY_FOR_UPDATE 100
 
 // output data on mcus that support it
 // #define SERIAL_DEBUGGING 
@@ -67,11 +63,8 @@ void loop()
     int sda = 1;
     short input = 0;
     short bit = 0;
-    #ifdef LED_SIGNAL
     byte led = 0;
-    #endif
     byte data_index = 0;
-    int last_update = millis();
 
     // This is a value that can't happen, ensuring our first read results
     // in a analogWrite.
@@ -84,14 +77,13 @@ void loop()
     pinMode(PWM_PIN, OUTPUT); 
     pinMode(SCL, OUTPUT);
 
-    // Restart the bitstream so we dont' start in the middle of packets
+    // Restart the bitstream so we don't start in the middle of packets
     digitalWrite(SCL, LOW);
     delay(RESTART_PULSE_LENGTH);
     pinMode(SCL, INPUT);
     pinMode(SDA, INPUT);
 
     int write_counter = 0;
-    int led = 0;
 
     for (;;)
     {
@@ -119,22 +111,16 @@ void loop()
                     inbound_plunger_value = ((input & DATA_MASK) >> 1); 
                     if (current_plunger_value != inbound_plunger_value)
                     {
-                        int now = millis();
-                        if (now - last_update > MINIMUM_DELAY_FOR_UPDATE)
+                        // Values range from 0 to 65. Map it so that we always return at least 1
+                        // because 0 is a long pulse to read.
+                        unsigned short plunger_adapted = inbound_plunger_value;
+                        if (!plunger_adapted)
                         {
-                            // Values range from 0 to 65. Map it so that we always return at least 1
-                            // because 0 is a long pulse to read.
-                            unsigned short plunger_adapted = inbound_plunger_value;
-                            if (!plunger_adapted)
-                            {
-                                plunger_adapted = 1;
-                            }
-
-                            analogWrite(PWM_PIN, plunger_adapted);
-                            current_plunger_value = inbound_plunger_value;
-                            last_update = millis();
+                            plunger_adapted = 1;
                         }
 
+                        analogWrite(PWM_PIN, plunger_adapted);
+                        current_plunger_value = inbound_plunger_value;
                         inbound_plunger_value = 0;
                     }
                 }
