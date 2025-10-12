@@ -23,3 +23,31 @@ If the accelerometer is unplugged, the last three bytes (on the two board sets I
 Plugging in the accelerometer (even without re-starting) immediately begins publishing a set of values that vary by about +/- 2. Tapping the accelerometer yields immediate changes but of course happens in all three axis. It would probably be possible to build a multi-master wiring in which the arduino changes the configuration values for axis and thus reveals which byte correlates to what axis. 
 
 It seems clear that the plunger IC, in addition to reading the data, is performing averaging/ranging on the data and presenting it back. This may explain why a relatively functional accelerometer seems to give a rough experience (or it could be the pinball code.)
+
+J9 / ribbon to main board
+Pin order is from silk screen on main board
+---------------    --------------
+| 19 17 15 13 11  9  7  5  3  1 |
+| 20 18 16 14 12 10  8  6  4  2 | 
+---------------------------------
+
+ 1 VCC J1 4
+ 2 I2C SDA J1 3
+ 3 I2C CLK J1 2
+ 4 GND
+ 5 LFLIPPER J3 3
+ 6 LMAGNA J3 2
+ 7 DPAD ? J4 4
+ 8 DPAD ? J4 5
+ 9 DPAD ? J4 2
+10 DPAD ? J4 3
+11 FKEY REWIND J5 5
+12 FKEY FNUDGE J5 4
+13 FKEY MENU J5 3
+14 FKEY START J5 2
+15 RLIPPER J2 3
+16 RFMAGNA J2 2
+17 GND
+18 SOLENOID J6 2
+19 NOT CONNECTED J7 2
+20 SOLENOID J8 2
